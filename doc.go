@@ -1,3 +1,4 @@
-// Package searchwire provides a small, forward-compatible Go client for the
-// subset of SearXNG's JSON Search API commonly needed by agent applications.
+// Package searchwire is a zero-configuration Go metasearch runtime for agent tooling.
+// Callers provide only a search query; built-in sources fan out concurrently,
+// partial failures are reported in the response, and results are deduplicated and ranked.
 package searchwire

@@ -1,32 +1,8 @@
 # searchwire
 
-`searchwire` is a small Go client for the subset of the SearXNG JSON Search API commonly needed by agent applications.
+Zero-config Go metasearch runtime for agent tooling.
 
-It deliberately models stable search primitives instead of mirroring every SearXNG engine, category, template, or Python result type. Unknown response fields and category names remain non-fatal, keeping the client useful as SearXNG evolves.
-
-## Scope
-
-Included:
-
-- GET requests to a SearXNG `/search` endpoint.
-- Query, category, engine, language, page, time-range, and safe-search parameters.
-- Ordinary results, answers, corrections, infoboxes, suggestions, and unresponsive-engine metadata.
-- Context cancellation, custom HTTP clients, bounded responses, and typed HTTP errors.
-- Compatibility with legacy string answers.
-
-Not included:
-
-- Full parity with SearXNG's Python result-type hierarchy.
-- A hardcoded catalog of engines or instance-specific categories.
-- Public-instance discovery, failover, or health monitoring.
-- Administration APIs, HTML scraping, or result rendering.
-
-## Requirements
-
-- Go 1.25 or newer.
-- A SearXNG instance with the JSON response format enabled.
-
-SearXNG instances commonly disable JSON responses by default. Configure the instance's `search.formats` list to include `json` before using it with this client.
+Searchwire runs ordinary web/text searches for you. Provide a query only — no SearXNG deployment, search host, engine selection, or API key is required for the default path.
 
 ## Install
 
@@ -48,70 +24,67 @@ import (
 )
 
 func main() {
-	client, err := searchwire.NewClient(searchwire.ClientOption{
-		URL:       "https://search.example.com",
-		UserAgent: "my-agent/1.0",
-	})
+	searcher := searchwire.New()
+	resp, err := searcher.Search(context.Background(), "Go context cancellation")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	output, err := client.Search(context.Background(), searchwire.SearchInput{
-		Query: "Go context cancellation",
-	})
-	if err != nil {
-		log.Fatal(err)
+	for _, result := range resp.Results {
+		fmt.Println(result.Title, result.URL)
 	}
-
-	for _, result := range output.Results {
-		fmt.Printf("%s\n%s\n", result.Title, result.URL)
+	for _, sourceErr := range resp.Errors {
+		log.Printf("source %s failed: %s", sourceErr.Source, sourceErr.Error)
 	}
 }
 ```
 
-The client accepts either an instance root URL or an existing `/search` URL. For a subpath deployment such as `https://example.com/searx/`, it requests `https://example.com/searx/search`.
+## Built-in sources
 
-## Optional parameters
+Searchwire fans out concurrently to:
+
+1. Brave Search (HTML)
+2. Startpage (HTML)
+3. Wikipedia MediaWiki API (JSON)
+
+Source ordering is also the tie-break order when fused scores are equal.
+
+## Partial failures
+
+When at least one source succeeds, `Search` returns a `*Response` with merged results and any source failures in `Response.Errors`. When every source fails, `Search` returns a `*SearchError` listing each failure.
+
+## Advanced options
 
 ```go
-language := "id-ID"
-page := uint(2)
-timeRange := searchwire.TimeRangeMonth
-safeSearch := searchwire.SafeSearchStrict
-
-output, err := client.Search(ctx, searchwire.SearchInput{
-	Query:      "distributed systems",
-	Categories: []searchwire.Category{"general", "it"},
-	Engines:    []searchwire.SearchEngine{"startpage", "github"},
-	Language:   &language,
-	PageNumber: &page,
-	TimeRange:  &timeRange,
-	SafeSearch: &safeSearch,
-})
+searcher := searchwire.New(
+	searchwire.WithHTTPClient(httpClient),
+	searchwire.WithLimit(5),
+)
 ```
 
-Category and engine values are strings because each SearXNG instance controls which values are available.
+`WithHTTPClient(nil)` is ignored. `WithLimit` applies only to positive values.
 
-## Errors and limits
+## Limitations
 
-- `HTTPError` contains the status code and a bounded response body for non-2xx responses.
-- `ErrUnexpectedContentType` identifies instances that return HTML instead of JSON.
-- `ErrResponseTooLarge` identifies responses over the configured limit, which defaults to 1 MiB.
-- The default HTTP client timeout is 20 seconds. Supply `ClientOption.HTTPClient` to control transport or timeout behavior.
+- HTML adapters can break when source markup changes.
+- Ordinary text/web results only; no images, news, maps, or shopping categories.
+- No CAPTCHA solving, proxy rotation, or anti-bot bypasses.
+- Not a promise of SearXNG parity or engine compatibility.
 
 ## Development
 
 ```bash
+gofmt -w *.go
+go mod tidy
+go test ./...
 go test -race ./...
 go vet ./...
+SEARCHWIRE_LIVE=1 go test -run TestLiveSearch -v
 ```
 
-Live SearXNG access is not required by the test suite; protocol behavior is tested with local HTTP fixtures.
+## Identity and license
 
-## Stability
+The metasearch aggregation concept is inspired by systems such as [SearXNG](https://github.com/searxng/searxng), but Searchwire is **not** a SearXNG client, port, configuration-compatible implementation, or source-code derivative. SearXNG is AGPL; Searchwire is MIT.
 
-The API is pre-v1 and may change while its first production consumer is integrated. Scope expansion should be driven by demonstrated consumer needs rather than parity with SearXNG internals.
+This library is pre-v1; APIs may change.
 
-## License
-
-[MIT](LICENSE)
+MIT License. See [LICENSE](LICENSE).

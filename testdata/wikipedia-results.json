@@ -1,0 +1,20 @@
+{
+  "query": {
+    "pages": [
+      {
+        "pageid": 23862,
+        "title": "Go (programming language)",
+        "index": 2,
+        "extract": "Go is a statically typed, compiled programming language.",
+        "fullurl": "https://en.wikipedia.org/wiki/Go_(programming_language)"
+      },
+      {
+        "pageid": 10929263,
+        "title": "Go",
+        "index": 1,
+        "extract": "Go is a board game.",
+        "fullurl": "https://en.wikipedia.org/wiki/Go"
+      }
+    ]
+  }
+}

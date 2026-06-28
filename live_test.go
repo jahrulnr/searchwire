@@ -2,30 +2,40 @@ package searchwire
 
 import (
 	"context"
+	"log"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
 
 func TestLiveSearch(t *testing.T) {
-	endpoint := os.Getenv("SEARXNG_URL")
-	if endpoint == "" {
-		t.Skip("SEARXNG_URL is not set")
-	}
-	client, err := NewClient(ClientOption{URL: endpoint, UserAgent: "searchwire-live-test/1"})
-	if err != nil {
-		t.Fatal(err)
+	if os.Getenv("SEARCHWIRE_LIVE") != "1" {
+		t.Skip("set SEARCHWIRE_LIVE=1 to run live network smoke test")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	output, err := client.Search(ctx, SearchInput{Query: "Tokyo"})
+
+	resp, err := New().Search(ctx, "Go programming language")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if output.Query != "Tokyo" {
-		t.Fatalf("query = %q", output.Query)
+	if len(resp.Results) == 0 {
+		t.Fatal("expected at least one merged result")
 	}
-	if len(output.Results) == 0 && len(output.Answers) == 0 && len(output.Infoboxes) == 0 {
-		t.Fatal("search returned no usable results")
+	validURL := false
+	for _, result := range resp.Results {
+		if strings.HasPrefix(result.URL, "http://") || strings.HasPrefix(result.URL, "https://") {
+			validURL = true
+			break
+		}
+	}
+	if !validURL {
+		t.Fatal("expected at least one http(s) result URL")
+	}
+	if len(resp.Errors) > 0 {
+		for _, sourceErr := range resp.Errors {
+			log.Printf("partial source failure: %s: %s", sourceErr.Source, sourceErr.Error)
+		}
 	}
 }
