@@ -71,6 +71,44 @@ func (f *fetcher) get(ctx context.Context, rawURL, accept string, allowedTypes [
 	return body, nil
 }
 
+func (f *fetcher) getGitHub(ctx context.Context, rawURL, token string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("User-Agent", f.userAgent)
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := f.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, f.maxResponseSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+	if int64(len(body)) > f.maxResponseSize {
+		return nil, ErrResponseTooLarge
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return nil, &HTTPError{
+			StatusCode: resp.StatusCode,
+			Status:     resp.Status,
+			Body:       strings.TrimSpace(string(body)),
+		}
+	}
+	if err := validateContentType(resp.Header.Get("Content-Type"), []string{"application/json"}); err != nil {
+		return nil, err
+	}
+	return body, nil
+}
+
 func validateContentType(header string, allowed []string) error {
 	if len(allowed) == 0 || strings.TrimSpace(header) == "" {
 		return nil
@@ -111,11 +149,7 @@ func isSafeResultURL(raw string) bool {
 }
 
 func defaultSources() []source {
-	return []source{
-		braveSource{},
-		startpageSource{},
-		wikipediaSource{},
-	}
+	return sourcesFromConfig(DefaultConfig())
 }
 
 func sourceNames(sources []source) []string {
@@ -146,8 +180,8 @@ func orderSourceErrors(failures []SourceError, sources []source) []SourceError {
 }
 
 // newSearcherWithSources is used by package tests to inject fake sources.
-func newSearcherWithSources(sources []source, options ...Option) *Searcher {
-	s := New(options...)
+func newSearcherWithSources(sources []source, cfg Config) *Searcher {
+	s := New(cfg)
 	s.sources = sources
 	return s
 }

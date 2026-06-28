@@ -19,29 +19,6 @@ type HTTPClient interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-// Option configures a Searcher.
-type Option func(*Searcher)
-
-// WithHTTPClient sets the HTTP client used for all source requests.
-// Nil is ignored.
-func WithHTTPClient(client HTTPClient) Option {
-	return func(s *Searcher) {
-		if client != nil {
-			s.httpClient = client
-		}
-	}
-}
-
-// WithLimit sets the maximum number of merged results returned.
-// Non-positive values are ignored.
-func WithLimit(limit int) Option {
-	return func(s *Searcher) {
-		if limit > 0 {
-			s.limit = limit
-		}
-	}
-}
-
 // Searcher fans out to built-in sources, merges duplicates, and ranks results.
 type Searcher struct {
 	httpClient      HTTPClient
@@ -51,19 +28,17 @@ type Searcher struct {
 	sources         []source
 }
 
-// New returns a Searcher with built-in sources and sensible defaults.
-func New(options ...Option) *Searcher {
-	s := &Searcher{
-		httpClient:      &http.Client{Timeout: defaultTimeout},
-		userAgent:       defaultUserAgent,
-		limit:           defaultLimit,
-		maxResponseSize: defaultMaxResponseBytes,
-		sources:         defaultSources(),
+// New returns a Searcher configured by cfg. Use DefaultConfig() or the zero
+// value for zero-configuration behavior.
+func New(cfg Config) *Searcher {
+	cfg = cfg.withDefaults()
+	return &Searcher{
+		httpClient:      cfg.HTTPClient,
+		userAgent:       cfg.UserAgent,
+		limit:           cfg.Limit,
+		maxResponseSize: cfg.MaxResponseBytes,
+		sources:         sourcesFromConfig(cfg),
 	}
-	for _, opt := range options {
-		opt(s)
-	}
-	return s
 }
 
 // Response is the merged output of a metasearch query.

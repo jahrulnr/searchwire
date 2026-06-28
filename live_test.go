@@ -16,7 +16,7 @@ func TestLiveSearch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	resp, err := New().Search(ctx, "Go programming language")
+	resp, err := New(Config{}).Search(ctx, "Go programming language")
 	if err != nil {
 		t.Fatal(err)
 	}

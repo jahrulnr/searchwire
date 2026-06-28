@@ -1,0 +1,16 @@
+{
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {
+      "title": "Add context cancellation docs",
+      "html_url": "https://github.com/golang/go/issues/12345",
+      "body": "Document how context cancellation propagates through goroutines."
+    },
+    {
+      "title": "Fix cancellation leak",
+      "html_url": "https://github.com/example/lib/pull/99",
+      "body": "Ensure contexts are cancelled when requests finish."
+    }
+  ]
+}

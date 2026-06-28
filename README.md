@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	searcher := searchwire.New()
+	searcher := searchwire.New(searchwire.Config{})
 	resp, err := searcher.Search(context.Background(), "Go context cancellation")
 	if err != nil {
 		log.Fatal(err)
@@ -38,6 +38,8 @@ func main() {
 }
 ```
 
+`searchwire.New(searchwire.Config{})` and `searchwire.New(searchwire.DefaultConfig())` are equivalent.
+
 ## Built-in sources
 
 Searchwire fans out concurrently to:
@@ -45,23 +47,51 @@ Searchwire fans out concurrently to:
 1. Brave Search (HTML)
 2. Startpage (HTML)
 3. Wikipedia MediaWiki API (JSON)
+4. GitHub Search API (repositories + issues; falls back to repositories when issues search fails)
 
 Source ordering is also the tie-break order when fused scores are equal.
+
+Unauthenticated GitHub search is limited to about 10 requests per minute across search endpoints.
+
+## Configuration
+
+`searchwire.Config` groups runtime settings and optional integrations:
+
+```go
+searcher := searchwire.New(searchwire.Config{
+	Limit:      5,
+	HTTPClient: httpClient,
+	GitHub: searchwire.GitHubConfig{
+		Token: "ghp_...", // or read GITHUB_TOKEN
+	},
+})
+```
+
+### GitHub
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `Enabled` | `true` | Register the GitHub source |
+| `Token` | — | Bearer token; overrides env |
+| `TokenEnv` | `GITHUB_TOKEN` | Env var for token |
+| `SearchIssues` | `true` | Repo+issues (B); `false` = repos only (A) |
+
+When `SearchIssues` is true and issues search fails, repository results are still returned.
+
+### Future development
+
+These `Config` fields exist for upcoming work only. **They are ignored by `New()` today.**
+
+| Block | Planned integration |
+|-------|---------------------|
+| `GoogleConfig` | Google Programmable Search JSON API (`APIKey` / `GOOGLE_API_KEY`, `CX` / `GOOGLE_CX`) |
+| `CustomSearchConfig` | Caller-provided search endpoint (`URL`) |
+
+Do not rely on them for behavior until a source adapter lands and tests cover it.
 
 ## Partial failures
 
 When at least one source succeeds, `Search` returns a `*Response` with merged results and any source failures in `Response.Errors`. When every source fails, `Search` returns a `*SearchError` listing each failure.
-
-## Advanced options
-
-```go
-searcher := searchwire.New(
-	searchwire.WithHTTPClient(httpClient),
-	searchwire.WithLimit(5),
-)
-```
-
-`WithHTTPClient(nil)` is ignored. `WithLimit` applies only to positive values.
 
 ## Limitations
 

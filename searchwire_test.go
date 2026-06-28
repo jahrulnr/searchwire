@@ -17,9 +17,9 @@ import (
 )
 
 func TestNewCreatesDefaultSearcher(t *testing.T) {
-	s := New()
-	if s == nil || len(s.sources) != 3 {
-		t.Fatalf("expected default searcher with 3 sources, got %#v", s)
+	s := New(Config{})
+	if s == nil || len(s.sources) != 4 {
+		t.Fatalf("expected default searcher with 4 sources, got %#v", s)
 	}
 }
 
@@ -31,7 +31,7 @@ func TestSearchTrimsQuery(t *testing.T) {
 			got = query
 			return []sourceResult{{title: "A", url: "https://example.com/a", rank: 1}}, nil
 		},
-	}})
+	}}, Config{})
 	resp, err := s.Search(context.Background(), "  hello  ")
 	if err != nil {
 		t.Fatal(err)
@@ -42,7 +42,7 @@ func TestSearchTrimsQuery(t *testing.T) {
 }
 
 func TestSearchRejectsEmptyQuery(t *testing.T) {
-	s := New()
+	s := New(Config{})
 	if _, err := s.Search(context.Background(), "   "); !errors.Is(err, ErrEmptyQuery) {
 		t.Fatalf("err = %v", err)
 	}
@@ -72,7 +72,7 @@ func TestSearchRunsSourcesConcurrently(t *testing.T) {
 			started <- "fast"
 			return []sourceResult{{title: "Fast", url: "https://example.com/fast", rank: 1}}, nil
 		}},
-	})
+	}, Config{})
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -103,7 +103,7 @@ func TestSearchPartialFailure(t *testing.T) {
 		fakeSource{nameValue: "bad", searchFn: func(context.Context, *fetcher, string, int) ([]sourceResult, error) {
 			return nil, errors.New("boom")
 		}},
-	})
+	}, Config{})
 	resp, err := s.Search(context.Background(), "test")
 	if err != nil {
 		t.Fatal(err)
@@ -117,7 +117,7 @@ func TestSearchAllSourcesFail(t *testing.T) {
 	s := newSearcherWithSources([]source{
 		fakeSource{nameValue: "a", searchFn: failSource("a fail")},
 		fakeSource{nameValue: "b", searchFn: failSource("b fail")},
-	})
+	}, Config{})
 	_, err := s.Search(context.Background(), "test")
 	var searchErr *SearchError
 	if !errors.As(err, &searchErr) {
@@ -134,7 +134,7 @@ func TestSearchZeroResultsIsSuccess(t *testing.T) {
 		searchFn: func(context.Context, *fetcher, string, int) ([]sourceResult, error) {
 			return nil, nil
 		},
-	}})
+	}}, Config{})
 	resp, err := s.Search(context.Background(), "test")
 	if err != nil {
 		t.Fatal(err)
@@ -151,7 +151,7 @@ func TestSearchContextCancellation(t *testing.T) {
 			<-ctx.Done()
 			return nil, ctx.Err()
 		},
-	}})
+	}}, Config{})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	if _, err := s.Search(ctx, "test"); !errors.Is(err, context.Canceled) {
@@ -166,7 +166,7 @@ func TestSearchContextDeadline(t *testing.T) {
 			<-ctx.Done()
 			return nil, ctx.Err()
 		},
-	}})
+	}}, Config{})
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
 	time.Sleep(5 * time.Millisecond)
@@ -175,7 +175,7 @@ func TestSearchContextDeadline(t *testing.T) {
 	}
 }
 
-func TestWithLimitTruncates(t *testing.T) {
+func TestConfigLimitTruncates(t *testing.T) {
 	s := newSearcherWithSources([]source{fakeSource{
 		nameValue: "many",
 		searchFn: func(context.Context, *fetcher, string, int) ([]sourceResult, error) {
@@ -185,21 +185,21 @@ func TestWithLimitTruncates(t *testing.T) {
 				{title: "3", url: "https://example.com/3", rank: 3},
 			}, nil
 		},
-	}}, WithLimit(2))
+	}}, Config{Limit: 2})
 	resp, err := s.Search(context.Background(), "test")
 	if err != nil || len(resp.Results) != 2 {
 		t.Fatalf("results = %#v err = %v", resp.Results, err)
 	}
 }
 
-func TestWithLimitIgnoresInvalid(t *testing.T) {
-	s := New(WithLimit(0), WithLimit(-1))
+func TestConfigLimitIgnoresInvalid(t *testing.T) {
+	s := New(Config{Limit: 0})
 	if s.limit != defaultLimit {
 		t.Fatalf("limit = %d", s.limit)
 	}
 }
 
-func TestWithHTTPClientUsed(t *testing.T) {
+func TestConfigHTTPClientUsed(t *testing.T) {
 	var called atomic.Bool
 	client := &http.Client{Transport: roundTripperFunc(func(*http.Request) (*http.Response, error) {
 		called.Store(true)
@@ -210,7 +210,7 @@ func TestWithHTTPClientUsed(t *testing.T) {
 			Header:     http.Header{"Content-Type": []string{"application/json"}},
 		}, nil
 	})}
-	s := newSearcherWithSources([]source{wikipediaSource{}}, WithHTTPClient(client))
+	s := newSearcherWithSources([]source{wikipediaSource{}}, Config{HTTPClient: client})
 	if _, err := s.Search(context.Background(), "Go"); err != nil {
 		t.Fatal(err)
 	}
