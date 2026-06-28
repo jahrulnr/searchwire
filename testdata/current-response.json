@@ -1,0 +1,40 @@
+{
+  "query": "Tokyo",
+  "results": [
+    {
+      "url": "https://example.com/tokyo",
+      "title": "Tokyo travel guide",
+      "content": "A concise guide to Tokyo.",
+      "publishedDate": null,
+      "engine": "startpage",
+      "template": "default.html",
+      "engines": ["startpage"],
+      "category": "general",
+      "future_field": {"safe": true}
+    },
+    {
+      "url": "https://example.com/package",
+      "title": "A future category",
+      "content": "Unknown categories remain readable.",
+      "engine": "future",
+      "category": "packages"
+    }
+  ],
+  "answers": [
+    {"answer": "Tokyo is the capital of Japan.", "engine": "answerer:test"},
+    "Legacy answer"
+  ],
+  "corrections": ["tokyo"],
+  "infoboxes": [
+    {
+      "infobox": "Tokyo",
+      "id": "https://en.wikipedia.org/wiki/Tokyo",
+      "content": "Capital of Japan.",
+      "engine": "wikipedia",
+      "urls": [{"title": "Wikipedia", "url": "https://en.wikipedia.org/wiki/Tokyo"}]
+    }
+  ],
+  "suggestions": ["Tokyo weather"],
+  "unresponsive_engines": [["google", "timeout"]],
+  "future_envelope_field": [1, 2, 3]
+}
